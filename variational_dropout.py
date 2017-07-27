@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+import tensorflow as tf
+
 # required operations
 def paranoid_log(x, eps=1e-8):
     return tf.log(x+eps)
@@ -8,13 +10,14 @@ def clip(x):
     return tf.clip_by_value(x, -8., 8.)
 
 def get_log_alpha(log_sigma2, w):
-    return clip(log_sigma2 - paranoid_log(tf.square(w)))
+    log_alpha = clip(log_sigma2 - paranoid_log(tf.square(w)))
+    return tf.identity(log_alpha, name='log_alpha')
 
 #def vardrop_fc(x, log_alpha, w, phase, thresh=3):
 def fully_connected(x, phase, n_hidden, activation_fn=tf.nn.relu, thresh=3,
         initializer=tf.contrib.layers.xavier_initializer):
     # you get xavier initialization, and that's it for now
-    n_input = tf.shape(x)[1]
+    n_input = int(x.shape[1])
     w = tf.get_variable("w", [n_input, n_hidden],
             initializer=initializer())
     b = tf.get_variable("b", [n_hidden,],
@@ -38,9 +41,9 @@ def fc_masked(x, select_mask, w):
     return tf.matmul(x, w*select_mask)
 
 #def vardrop_conv2d(x, log_alpha, w, phase, thresh=3):
-def conv2d(x, n_filters, kernel_size, phase,
+def conv2d(x, phase, n_filters, kernel_size, activation_fn=tf.nn.relu,
         initializer=tf.contrib.layers.xavier_initializer_conv2d, thresh=3):
-    n_input_channels = tf.shape(x)[3]
+    n_input_channels = int(x.shape[3])
     # define parameters
     conv_param_shape = kernel_size+[n_input_channels, n_filters]
     w = tf.get_variable("w", conv_param_shape,
@@ -48,7 +51,7 @@ def conv2d(x, n_filters, kernel_size, phase,
     b = tf.get_variable("b", [n_filters],
             initializer=tf.constant_initializer())
     log_sigma2 = log_sigma2_variable(conv_param_shape)
-    log_alpha = get_log_alpha(log_sigma2)
+    log_alpha = get_log_alpha(log_sigma2, w)
 
     select_mask = tf.cast(tf.less(log_alpha, thresh), tf.float32)
     
@@ -85,3 +88,9 @@ def sparseness(log_alphas, thresh=3):
         N_active += n_active
         N_total += n_total
     return 1.0 - N_active/N_total
+
+# utility to gather variational dropout parameters
+def gather_logalphas(graph):
+    node_defs = [n for n in graph.as_graph_def().node if 'log_alpha' in n.name]
+    tensors = [graph.get_tensor_by_name(n.name+":0") for n in node_defs]
+    return tensors

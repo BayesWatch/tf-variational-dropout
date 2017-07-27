@@ -6,6 +6,11 @@ from tensorflow.examples.tutorials.mnist import input_data
 
 import variational_dropout as vd
 
+def max_pool_2x2(x):
+  """max_pool_2x2 downsamples a feature map by 2X."""
+  return tf.nn.max_pool(x, ksize=[1, 2, 2, 1],
+                        strides=[1, 2, 2, 1], padding='SAME')
+
 def deepnn(x, phase):
     """
     Builds the network graph.
@@ -29,7 +34,7 @@ def deepnn(x, phase):
 
     # First convolutional layer - maps one grayscale image to 32 feature maps.
     with tf.variable_scope('conv1'):
-        h_conv1 = vd.conv2d(x_image, 32, [5,5], phase)
+        h_conv1 = vd.conv2d(x_image, phase, 32, [5,5])
     
     # Pooling layer - downsamples by 2X.
     with tf.name_scope('pool1'):
@@ -37,7 +42,7 @@ def deepnn(x, phase):
 
     # Second convolutional layer -- maps 32 feature maps to 64.
     with tf.variable_scope('conv2'):
-        h_conv2 = vd.conv2d(h_pool1, 64, [5,5], phase)
+        h_conv2 = vd.conv2d(h_pool1, phase, 64, [5,5])
 
     # Second pooling layer.
     with tf.name_scope('pool2'):
@@ -47,11 +52,11 @@ def deepnn(x, phase):
     # is down to 7x7x64 feature maps -- maps this to 1024 features.
     with tf.variable_scope('fc1'):
         h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
-        h_fc1 = vd.fully_connected(h_pool2_flat, 1024, phase)
+        h_fc1 = vd.fully_connected(h_pool2_flat, phase, 1024)
 
     # Map the 1024 features to 10 classes, one for each digit
     with tf.variable_scope('fc2'):
-        y_conv = vd.fully_connected(h_fc1, 10, phase) 
+        y_conv = vd.fully_connected(h_fc1, phase, 10) 
     return y_conv
 
 def main():
@@ -71,9 +76,7 @@ def main():
         cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y_,
                                                             logits=y_conv))
         # prior DKL part of the ELBO
-        log_alphas = [v for v in tf.global_variables() if 'log_alpha' in v.name]
-        import pdb
-        pdb.set_trace()
+        log_alphas = vd.gather_logalphas(tf.get_default_graph())
         divergences = [vd.dkl_qp(la) for la in log_alphas]
         # combine to form the ELBO
         N = float(mnist.train.images.shape[0])
@@ -89,7 +92,7 @@ def main():
         accuracy = tf.reduce_mean(correct_prediction)
         
     with tf.name_scope('sparseness'):
-        sparse = sparseness(log_alphas)
+        sparse = vd.sparseness(log_alphas)
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())

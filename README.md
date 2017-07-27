@@ -6,7 +6,8 @@ Written to be relatively easy to apply.
 How to Use
 ==========
 
-This only implement two types of layers at the moment, fully connected and
+<<<<<<< HEAD
+This only implements two types of layers at the moment, fully connected and
 2D convolutional. Example usage is in `mnist.py`. We are following the
 [tensorflow docs on variable reuse][docs], so individual layers must have
 their own `variable_scope`. So, from the `mnist.py` script:
@@ -19,18 +20,19 @@ with tf.variable_scope('fc2'):
 ```
 
 The `phase` variable is used to switch between training and test time
-behavious. `True` is training time, and the noise variables will be
-sampled based on the current variational parameters. `False` is test time,
-and weights will be masked based on the current variational parameters.
-Training time is stochastic, while test is deterministic.
+behaviours, typically using a placeholder. `True` is training time, and the
+noise variables will be sampled based on the current variational
+parameters. `False` is test time, and weights will be masked based on the
+current variational parameters.  Training time is stochastic, while test is
+deterministic.
 
 To train with variational dropout, the loss function must also include the
 KL divergence between the approximate posterior and the prior. You can
 think of this as a (kind of) theoretically justified regulariser. There is
-a function to gather the `log_alpha` variables that parameterise the
-approximate posterior and another to estimate this KL divergence. A typical
-way to calculate it and add it to the loss is given in the `mnist.py`
-script:
+a function to gather the `log_alpha` (`vd.gather_log_alphas()`) variables
+that parameterise the approximate posterior and another to estimate this KL
+divergence. A typical way to calculate it and add it to the loss is given
+in the `mnist.py` script:
 
 ```
 # prior DKL part of the ELBO

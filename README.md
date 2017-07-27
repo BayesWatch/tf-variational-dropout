@@ -7,10 +7,9 @@ How to Use
 ==========
 
 This only implement two types of layers at the moment, fully connected and
-2D convolutional with "same" padding. Example usage is in `mnist.py`. We
-are following the [tensorflow docs on variable reuse][docs], so individual
-layers must have their own `variable_scope`. So, from the `mnist.py`
-script:
+2D convolutional. Example usage is in `mnist.py`. We are following the
+[tensorflow docs on variable reuse][docs], so individual layers must have
+their own `variable_scope`. So, from the `mnist.py` script:
 
 ```
 import variational_dropout as vd

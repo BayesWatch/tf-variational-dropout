@@ -13,7 +13,6 @@ def get_log_alpha(log_sigma2, w):
     log_alpha = clip(log_sigma2 - paranoid_log(tf.square(w)))
     return tf.identity(log_alpha, name='log_alpha')
 
-#def vardrop_fc(x, log_alpha, w, phase, thresh=3):
 def fully_connected(x, phase, n_hidden, activation_fn=tf.nn.relu, thresh=3,
         initializer=tf.contrib.layers.xavier_initializer):
     # you get xavier initialization, and that's it for now
@@ -40,9 +39,8 @@ def fc_noisy(x, log_alpha, w):
 def fc_masked(x, select_mask, w):
     return tf.matmul(x, w*select_mask)
 
-#def vardrop_conv2d(x, log_alpha, w, phase, thresh=3):
 def conv2d(x, phase, n_filters, kernel_size, activation_fn=tf.nn.relu,
-        initializer=tf.contrib.layers.xavier_initializer_conv2d, thresh=3):
+        initializer=tf.contrib.layers.xavier_initializer_conv2d, thresh=3, padding='SAME'):
     n_input_channels = int(x.shape[3])
     # define parameters
     conv_param_shape = kernel_size+[n_input_channels, n_filters]
@@ -55,18 +53,19 @@ def conv2d(x, phase, n_filters, kernel_size, activation_fn=tf.nn.relu,
 
     select_mask = tf.cast(tf.less(log_alpha, thresh), tf.float32)
     
-    activations = tf.cond(phase, lambda: conv2d_noisy(x, log_alpha, w), lambda: conv2d_masked(x, select_mask, w))
+    activations = tf.cond(phase, lambda: conv2d_noisy(x, log_alpha, w, padding=padding),
+            lambda: conv2d_masked(x, select_mask, w, padding=padding))
     return activation_fn(activations + b)
 
-def conv2d_noisy(x, log_alpha, w):
-    conved_mu = tf.nn.conv2d(x, w, strides=[1, 1, 1, 1], padding='SAME')
+def conv2d_noisy(x, log_alpha, w, padding='SAME'):
+    conved_mu = tf.nn.conv2d(x, w, strides=[1, 1, 1, 1], padding=padding)
     conved_si = tf.sqrt(tf.nn.conv2d(tf.square(x),
                                      tf.exp(log_alpha)*tf.square(w),
                                      strides=[1, 1, 1, 1], padding='SAME')+1e-8)
     return conved_mu + tf.random_normal(tf.shape(conved_mu))*conved_si
 
-def conv2d_masked(x, select_mask, w):
-    return tf.nn.conv2d(x, w*select_mask, strides=[1, 1, 1, 1], padding='SAME')
+def conv2d_masked(x, select_mask, w, padding='SAME'):
+    return tf.nn.conv2d(x, w*select_mask, strides=[1, 1, 1, 1], padding=padding)
 
 # homemade initializers
 def log_sigma2_variable(shape, ard_init=-10.):

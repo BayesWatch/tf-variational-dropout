@@ -6,7 +6,7 @@ Written to be relatively easy to apply.
 How to Use
 ==========
 
-<<<<<<< HEAD
+
 This only implements two types of layers at the moment, fully connected and
 2D convolutional. Example usage is in `mnist.py`. We are following the
 [tensorflow docs on variable reuse][docs], so individual layers must have

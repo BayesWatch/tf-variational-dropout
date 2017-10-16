@@ -84,7 +84,7 @@ def main():
         elbo = cross_entropy+(1./N)*dkl
 
     with tf.name_scope('adam_optimizer'):
-        train_step = tf.train.AdamOptimizer(1e-4).minimize(elbo)
+        train_step = tf.train.AdamOptimizer(1e-3).minimize(elbo)
 
     with tf.name_scope('accuracy'):
         correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
@@ -99,7 +99,7 @@ def main():
         for i in range(20000):
             batch = mnist.train.next_batch(50)
             if i % 1000 == 0:
-                train_accuracy, train_loss = sess.run((accuracy, cross_entropy),
+                train_accuracy, train_loss = sess.run((accuracy, elbo),
                     feed_dict={x: batch[0], y_: batch[1], phase: False})
                 print('step %d, training accuracy %g, training loss: %g' %
                     (i, train_accuracy, train_loss))

@@ -25,46 +25,63 @@ def convert_params(params):
 def conv2d(x, phase, n_filters, kernel_size, strides=[1,1,1,1],
         activation_fn=tf.nn.relu,
         initializer=tf.contrib.layers.xavier_initializer_conv2d,
-        padding='SAME', scope=None):
+        padding='SAME', scope=None, bias=True):
     with tf.variable_scope(scope):
         n_input_channels = int(x.shape[3])
         # define parameters
         conv_param_shape = kernel_size+[n_input_channels, n_filters]
         w = tf.get_variable("w", conv_param_shape,
                 initializer=initializer())
-        b = tf.get_variable("b", [n_filters],
-                initializer=tf.constant_initializer())
+        if bias:
+            b = tf.get_variable("b", [n_filters],
+                    initializer=tf.constant_initializer())
 
         activations = tf.nn.conv2d(x, w, strides=strides, padding=padding)
-        return activation_fn(activations + b)
+        if bias:
+            return activation_fn(activations + b)
+        else:
+            return activation_fn(activations)
 
 
 def resnet50(inputs, phase, conv2d=conv2d):
     '''Using bottleneck that matches those used in the PyTorch model
     definition: https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py#L41-L66
     '''
-
-    def group(input, base, stride, n):
+    expansion = 4
+    def group(input, base, in_planes, planes, num_blocks, stride):
+        strides = [stride]+[1]*(num_blocks-1)
         o = input
-        for i in range(0,n):
+        for i,stride in enumerate(strides):
             b_base = ('%s.block%d.conv') % (base, i)
             x = o
-            if i==0:
-                s = [1, stride, stride, 1]
-            else:
-                s = 4*[1]
-            assert False # not defining bottleneck yet
-
-            o = conv2d(x, phase, scope=b_base + '0', padding='SAME', strides=s)
-            o = tf.nn.relu(o)
-            o = conv2d(o, scope=b_base + '1', padding='SAME')
-            if i == 0 and stride != 1:
-                o += conv2d(x, scope=b_base + '_dim', strides=[1,stride,stride,1])
-            else:
-                o += x
-            o = tf.nn.relu(o)
+            o = bottleneck(x, b_base, in_planes, planes, stride)
+            in_planes = planes*expansion
         return o
-    
+
+    def bottleneck(input, base, in_planes, planes, stride=1):
+        o = conv2d(input, phase, planes, [1,1], scope=base+'0',
+                activation_fn=lambda x: x, bias=False)
+        o = tf.nn.relu(batch_norm(o, is_training=phase, scope=base+'0'))
+        o = conv2d(o, phase, planes, [3,3], activation_fn=lambda x: x,
+                scope=base+'1', strides=[1,stride,stride,1], padding='SAME',
+                bias=False)
+        o = tf.nn.relu(batch_norm(o, is_training=phase, scope=base+'1'))
+        o = conv2d(o, phase, planes*expansion, [1,1], activation_fn=lambda x:
+                x, scope=base+'2', bias=False)
+        o = batch_norm(o, is_training=phase, scope=base+'1')
+
+        if stride != 1 or in_planes != expansion*planes:
+            # shortcut 
+            s = conv2d(input, phase, expansion*planes, [1,1],
+                    strides=[1,stride,stride,1], activation_fn=lambda x:x,
+                    bias=False, scope=base+'short')
+            s = batch_norm(s, is_training=phase, scope=base+'short')
+            o = o+s
+        else:
+            o = o+input
+
+        return tf.nn.relu(o)
+
     # determine network size by parameters
     blocks = [sum([re.match('group%d.block\d+.conv0.weight'%j, k) is not None
                    for k in params.keys()]) for j in range(4)]

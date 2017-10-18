@@ -93,7 +93,7 @@ def resnet50(inputs, phase, conv2d=conv2d):
 
     o = conv2d_norelu(inputs, phase, 64, [3,3], scope='conv0',
                padding='SAME')
-    o = tf.nn.relu(batch_norm(o, phase, scope='bn0'))
+    o = tf.nn.relu(batch_norm(o, is_training=phase, scope='bn0'))
     #o = tf.pad(o, [[0,0], [1,1], [1,1], [0,0]])
     #o = tf.nn.max_pool(o, ksize=[1,3,3,1], strides=[1,2,2,1], padding='VALID')
     in_planes = 64
@@ -108,7 +108,7 @@ def resnet50(inputs, phase, conv2d=conv2d):
 
 if __name__ == '__main__':
     import numpy.random as npr
-    inputs = tf.Variable(npr.randn(1,32,32,3), dtype=tf.float32)
+    inputs = tf.Variable(npr.randn(16,32,32,3), dtype=tf.float32)
     phase = True
     out = resnet50(inputs, phase)
     with tf.Session() as sess:

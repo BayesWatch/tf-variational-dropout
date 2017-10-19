@@ -45,7 +45,7 @@ import cifar10
 
 parser = cifar10.parser
 
-parser.add_argument('--train_dir', type=str, default='/tmp/cifar10_train',
+parser.add_argument('--train_dir', type=str, default=os.environ.get('SCRATCH', '/tmp/cifar10')+'/tf-models',
                     help='Directory where to write event logs and checkpoint.')
 
 parser.add_argument('--max_steps', type=int, default=1000000,
@@ -58,7 +58,7 @@ parser.add_argument('--log_frequency', type=int, default=10,
                     help='How often to log results to the console.')
 
 
-def train():
+def train(train_dir):
   """Train CIFAR-10 for a number of steps."""
   with tf.Graph().as_default():
     global_step = tf.contrib.framework.get_or_create_global_step()
@@ -111,7 +111,7 @@ def train():
                                examples_per_sec, sec_per_batch))
 
     with tf.train.MonitoredTrainingSession(
-        checkpoint_dir=FLAGS.train_dir,
+        checkpoint_dir=train_dir,
         hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
                tf.train.NanTensorHook(loss),
                _LoggerHook()],
@@ -123,10 +123,11 @@ def train():
 
 def main(argv=None):  # pylint: disable=unused-argument
   cifar10.maybe_download_and_extract()
-  if tf.gfile.Exists(FLAGS.train_dir):
-    tf.gfile.DeleteRecursively(FLAGS.train_dir)
-  tf.gfile.MakeDirs(FLAGS.train_dir)
-  train()
+  train_dir = FLAGS.train_dir # will parse the options to change this location
+  if tf.gfile.Exists(train_dir):
+    tf.gfile.DeleteRecursively(train_dir)
+  tf.gfile.MakeDirs(train_dir)
+  train(train_dir)
 
 
 if __name__ == '__main__':

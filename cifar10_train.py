@@ -109,7 +109,7 @@ def train(train_dir):
                         'sec/batch)')
           print (format_str % (datetime.now(), self._step, loss_value,
                                examples_per_sec, sec_per_batch))
-
+    saver = tf.train.Saver()
     with tf.train.MonitoredTrainingSession(
         checkpoint_dir=train_dir,
         hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
@@ -117,6 +117,9 @@ def train(train_dir):
                _LoggerHook()],
         config=tf.ConfigProto(
             log_device_placement=FLAGS.log_device_placement)) as mon_sess:
+      ckpt = tf.train.get_checkpoint_state(FLAGS.train_dir)
+      if ckpt and ckpt.model_checkpoint_path:
+          saver.restore(mon_sess, ckpt.model_checkpoint_path)
       while not mon_sess.should_stop():
         mon_sess.run(train_op)
 

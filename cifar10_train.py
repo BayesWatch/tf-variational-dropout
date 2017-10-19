@@ -23,6 +23,7 @@ from __future__ import print_function
 from datetime import datetime
 import time
 import os
+import math
 
 import tensorflow as tf
 
@@ -36,8 +37,14 @@ parser.add_argument('--train_dir', type=str, default=os.environ.get('SCRATCH', '
 parser.add_argument('--max_steps', type=int, default=1000000,
                     help='Number of batches to run.')
 
+parser.add_argument('--lr', type=float, default=0.1,
+                    help='Initial learning rate.')
+
 parser.add_argument('--log_device_placement', type=bool, default=False,
                     help='Whether to log device placement.')
+
+parser.add_argument('--clean', action='store_true',
+                    help='Whether to start from clean (WILL DELETE OLD FILES).')
 
 parser.add_argument('--log_frequency', type=int, default=10,
                     help='How often to log results to the console.')
@@ -56,8 +63,8 @@ def train(train_dir):
       images, labels = cifar10.distorted_inputs()
       #phase = tf.placeholder(bool, name='is_train')
       phase = tf.Variable(True, name='is_train', dtype=bool, trainable=False)
-      #learning_rate = tf.placeholder(tf.float32, name='learning_rate')
-      learning_rate = tf.Variable(0.1, name='learning_rate', trainable=False)
+      learning_rate = tf.placeholder(tf.float32, name='learning_rate')
+      #learning_rate = tf.Variable(0.1, name='learning_rate', trainable=False)
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
@@ -94,30 +101,53 @@ def train(train_dir):
                         'sec/batch)')
           print (format_str % (datetime.now(), self._step, loss_value,
                                examples_per_sec, sec_per_batch))
+
+    class _ScheduleHook(tf.train.SessionRunHook):
+      """Controls learning rate schedule."""
+
+      def begin(self):
+        self.lr = FLAGS.lr
+        self.decay_rate = 0.1
+        self.N = 50000 # dataset size, known beforehand
+        self.minibatch_size = FLAGS.batch_size
+
+      def before_run(self, run_context):
+        return tf.train.SessionRunArgs(global_step)
+
+      def after_run(self, run_context, run_values):
+        step = self.minibatch_size*(run_values.results + 1)
+        period = self.N
+        self.lr = FLAGS.lr*(self.decay_rate**math.floor(step/period))
+        #format_str = '%s: step %d, lr = %.6f'
+        #print(format_str%(datetime.now(), step, self.lr))
+
+    schedule_hook = _ScheduleHook()
+
     saver = tf.train.Saver()
     with tf.train.MonitoredTrainingSession(
         checkpoint_dir=train_dir,
         hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
                tf.train.NanTensorHook(loss),
-               _LoggerHook()],
+               _LoggerHook(),
+               schedule_hook],
         config=tf.ConfigProto(
             log_device_placement=FLAGS.log_device_placement)) as mon_sess:
       ckpt = tf.train.get_checkpoint_state(train_dir)
       if ckpt and ckpt.model_checkpoint_path:
         saver.restore(mon_sess, ckpt.model_checkpoint_path)
       else:
-        print(ckpt)
-        print(train_dir, ckpt.model_checkpoint_path)
-        assert False
+        print("Starting clean in %s"%train_dir)
       global_step = tf.contrib.framework.get_or_create_global_step()
         
       while not mon_sess.should_stop():
-        mon_sess.run(train_op)
+        mon_sess.run(train_op, feed_dict={learning_rate:schedule_hook.lr})
 
 
 def main(argv=None):  # pylint: disable=unused-argument
   cifar10.maybe_download_and_extract()
   train_dir = FLAGS.train_dir # will parse the options to change this location
+  if tf.gfile.Exists(train_dir) and FLAGS.clean:
+    tf.gfile.DeleteRecursively(train_dir)
   if not tf.gfile.Exists(train_dir):
     tf.gfile.MakeDirs(train_dir)
   train(train_dir)

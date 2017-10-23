@@ -47,6 +47,8 @@ import tensorflow as tf
 import cifar10_input
 import models
 
+import variational_dropout as vd
+
 parser = argparse.ArgumentParser()
 
 # Basic model parameters.
@@ -164,7 +166,7 @@ def inputs(eval_data):
   return images, labels
 
 
-def inference(images, phase):
+def inference(images, phase, conv2d):
   """Build the CIFAR-10 model.
 
   Args:
@@ -173,7 +175,10 @@ def inference(images, phase):
   Returns:
     Logits.
   """
-  return models.resnet50(images, phase)
+  if conv2d is not None:
+    return models.resnet50(images, phase, conv2d)
+  else:
+    return models.resnet50(images, phase)
 
 
 def loss(logits, labels):
@@ -193,7 +198,21 @@ def loss(logits, labels):
   cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(
       labels=labels, logits=logits, name='cross_entropy_per_example')
   cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
-  tf.add_to_collection('losses', cross_entropy_mean)
+
+  # prior DKL part of the ELBO
+  log_alphas = vd.gather_logalphas(tf.get_default_graph())
+  print("found %i logalphas"%len(log_alphas))
+  divergences = [vd.dkl_qp(la) for la in log_alphas]
+  # combine to form the ELBO
+  N = float(50000.) # only useable with cifar-10
+  dkl = tf.reduce_sum(tf.stack(divergences), name='elbo')
+  elbo = cross_entropy_mean+(1./N)*dkl
+  tf.add_to_collection('losses', elbo)
+
+  if not len(log_alphas) > 0:
+    # add l2 loss
+    l2_loss = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables()], name='l2')
+    tf.add_to_collection('losses', 5e-4*l2_loss)
 
   # The total loss is defined as the cross entropy loss plus all of the weight
   # decay terms (L2 loss).
@@ -253,7 +272,7 @@ def train(total_loss, global_step, learning_rate):
 
   # Compute gradients.
   with tf.control_dependencies([loss_averages_op]):
-    opt = tf.train.GradientDescentOptimizer(lr)
+    opt = tf.train.MomentumOptimizer(lr, 0.9)
     grads = opt.compute_gradients(total_loss)
 
   # Apply gradients.

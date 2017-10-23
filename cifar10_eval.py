@@ -24,14 +24,18 @@ import math
 import time
 import os
 
+# don't use the gpu
+#os.environ['CUDA_VISIBLE_DEVICES'] = ""
+
 import numpy as np
 import tensorflow as tf
 
 import cifar10
+import variational_dropout as vd
 
 parser = cifar10.parser
 
-parser.add_argument('--eval_dir', type=str, default=os.environ.get('SCRATCH', '/tmp/cifar10')+'/tf-models-eval',
+parser.add_argument('--eval_dir', type=str, default=os.environ.get('SCRATCH', '/tmp/cifar10')+'/tf-models',
                     help='Directory where to write event logs.')
 
 parser.add_argument('--eval_data', type=str, default='test',
@@ -42,6 +46,9 @@ parser.add_argument('--checkpoint_dir', type=str, default=os.environ.get('SCRATC
 
 parser.add_argument('--eval_interval_secs', type=int, default=60*5,
                     help='How often to run the eval.')
+
+parser.add_argument('--vanilla', action='store_true',
+                    help='Run without variational dropout.')
 
 parser.add_argument('--num_examples', type=int, default=10000,
                     help='Number of examples to run.')
@@ -101,7 +108,7 @@ def eval_once(saver, summary_writer, top_k_op, summary_op):
     coord.join(threads, stop_grace_period_secs=10)
 
 
-def evaluate():
+def evaluate(eval_dir):
   """Eval CIFAR-10 for a number of steps."""
   with tf.Graph().as_default() as g:
     # Get images and labels for CIFAR-10.
@@ -111,7 +118,11 @@ def evaluate():
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
-    logits = cifar10.inference(images, phase)
+    if not FLAGS.vanilla:
+      logits = cifar10.inference(images, phase, vd.conv2d)
+    else:
+      logits = cifar10.inference(images, phase, None)
+
 
     # Calculate predictions.
     top_k_op = tf.nn.in_top_k(logits, labels, 1)
@@ -125,7 +136,7 @@ def evaluate():
     # Build the summary operation based on the TF collection of Summaries.
     summary_op = tf.summary.merge_all()
 
-    summary_writer = tf.summary.FileWriter(FLAGS.eval_dir, g)
+    summary_writer = tf.summary.FileWriter(eval_dir, g)
 
     # once is fine
     eval_once(saver, summary_writer, top_k_op, summary_op)
@@ -133,10 +144,15 @@ def evaluate():
 
 def main(argv=None):  # pylint: disable=unused-argument
   cifar10.maybe_download_and_extract()
-  if tf.gfile.Exists(FLAGS.eval_dir):
-    tf.gfile.DeleteRecursively(FLAGS.eval_dir)
-  tf.gfile.MakeDirs(FLAGS.eval_dir)
-  evaluate()
+  if FLAGS.vanilla:
+    eval_dir = FLAGS.eval_dir + '/vanilla' 
+  else:
+    eval_dir = FLAGS.eval_dir + '/vardrop'
+  eval_dir += '/eval'
+  if tf.gfile.Exists(eval_dir):
+    tf.gfile.DeleteRecursively(eval_dir)
+  tf.gfile.MakeDirs(eval_dir)
+  evaluate(eval_dir)
 
 
 if __name__ == '__main__':

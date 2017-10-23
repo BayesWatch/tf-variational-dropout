@@ -29,6 +29,8 @@ import tensorflow as tf
 
 import cifar10
 
+import variational_dropout as vd
+
 parser = cifar10.parser
 
 parser.add_argument('--train_dir', type=str, default=os.environ.get('SCRATCH', '/tmp/cifar10')+'/tf-models',
@@ -46,6 +48,9 @@ parser.add_argument('--log_device_placement', type=bool, default=False,
 parser.add_argument('--clean', action='store_true',
                     help='Whether to start from clean (WILL DELETE OLD FILES).')
 
+parser.add_argument('--vanilla', action='store_true',
+                    help='Run without variational dropout.')
+
 parser.add_argument('--log_frequency', type=int, default=10,
                     help='How often to log results to the console.')
 
@@ -54,7 +59,6 @@ def train(train_dir):
   """Train CIFAR-10 for a number of steps."""
   with tf.Graph().as_default():
     global_step = tf.contrib.framework.get_or_create_global_step()
-    print(global_step)
 
     # Get images and labels for CIFAR-10.
     # Force input pipeline to CPU:0 to avoid operations sometimes ending up on
@@ -68,7 +72,10 @@ def train(train_dir):
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
-    logits = cifar10.inference(images, phase)
+    if not FLAGS.vanilla:
+      logits = cifar10.inference(images, phase, vd.conv2d)
+    else:
+      logits = cifar10.inference(images, phase, None)
 
     # Calculate loss.
     loss = cifar10.loss(logits, labels)
@@ -116,7 +123,7 @@ def train(train_dir):
 
       def after_run(self, run_context, run_values):
         step = self.minibatch_size*(run_values.results + 1)
-        period = self.N
+        period = 60*self.N
         self.lr = FLAGS.lr*(self.decay_rate**math.floor(step/period))
         #format_str = '%s: step %d, lr = %.6f'
         #print(format_str%(datetime.now(), step, self.lr))
@@ -145,7 +152,10 @@ def train(train_dir):
 
 def main(argv=None):  # pylint: disable=unused-argument
   cifar10.maybe_download_and_extract()
-  train_dir = FLAGS.train_dir # will parse the options to change this location
+  if FLAGS.vanilla:
+    train_dir = FLAGS.train_dir + '/vanilla' 
+  else:
+    train_dir = FLAGS.train_dir + '/vardrop'
   if tf.gfile.Exists(train_dir) and FLAGS.clean:
     tf.gfile.DeleteRecursively(train_dir)
   if not tf.gfile.Exists(train_dir):

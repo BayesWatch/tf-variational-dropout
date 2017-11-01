@@ -53,6 +53,8 @@ parser.add_argument('--vanilla', action='store_true',
 parser.add_argument('--num_examples', type=int, default=10000,
                     help='Number of examples to run.')
 
+parser.add_argument('--run_once', type=bool, default=False,
+                    help='Whether to run eval only once.')
 
 def eval_once(saver, summary_writer, top_k_op, summary_op):
   """Run Eval once.
@@ -138,8 +140,11 @@ def evaluate(eval_dir):
 
     summary_writer = tf.summary.FileWriter(eval_dir, g)
 
-    # once is fine
-    eval_once(saver, summary_writer, top_k_op, summary_op)
+    while True:
+      eval_once(saver, summary_writer, top_k_op, summary_op)
+      if FLAGS.run_once:
+        break
+      time.sleep(FLAGS.eval_interval_secs)
 
 
 def main(argv=None):  # pylint: disable=unused-argument
@@ -157,4 +162,8 @@ def main(argv=None):  # pylint: disable=unused-argument
 
 if __name__ == '__main__':
   FLAGS = parser.parse_args()
+  if FLAGS.vanilla:
+    FLAGS.checkpoint_dir = FLAGS.checkpoint_dir + '/vanilla' 
+  else:
+    FLAGS.checkpoint_dir = FLAGS.checkpoint_dir + '/vardrop'
   tf.app.run()

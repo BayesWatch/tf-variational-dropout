@@ -294,7 +294,10 @@ def train(total_loss, global_step, learning_rate):
       MOVING_AVERAGE_DECAY, global_step)
   variables_averages_op = variable_averages.apply(tf.trainable_variables())
 
-  with tf.control_dependencies([apply_gradient_op, variables_averages_op]):
+  # for batch norm
+  update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+
+  with tf.control_dependencies([apply_gradient_op, variables_averages_op, update_ops]):
     train_op = tf.no_op(name='train')
 
   return train_op

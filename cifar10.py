@@ -297,7 +297,7 @@ def train(total_loss, global_step, learning_rate):
   # for batch norm
   update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
-  with tf.control_dependencies([apply_gradient_op, variables_averages_op, update_ops]):
+  with tf.control_dependencies([apply_gradient_op, variables_averages_op]+update_ops):
     train_op = tf.no_op(name='train')
 
   return train_op

@@ -67,8 +67,8 @@ def train(train_dir):
       images, labels = cifar10.distorted_inputs()
       #phase = tf.placeholder(bool, name='is_train')
       phase = tf.Variable(True, name='is_train', dtype=bool, trainable=False)
-      learning_rate = tf.placeholder(tf.float32, name='learning_rate')
-      #learning_rate = tf.Variable(0.1, name='learning_rate', trainable=False)
+      #learning_rate = tf.placeholder(tf.float32, name='learning_rate')
+      learning_rate = tf.Variable(0.1, name='learning_rate', trainable=False)
 
     # Build a Graph that computes the logits predictions from the
     # inference model.

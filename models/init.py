@@ -13,4 +13,5 @@ class PyTorchInit(tf.random_uniform_initializer):
         stdv = 1./math.sqrt(n)
         self.minval = -stdv
         self.maxval = stdv
+        print(self.minval, self.maxval, shape)
         super(PyTorchInit, self).__call__(shape, dtype=dtype, partition_info=partition_info)

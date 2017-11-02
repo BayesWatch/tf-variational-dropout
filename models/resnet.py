@@ -9,8 +9,12 @@ them, so we could load from pytorch the same way illustrated in the zoo.
 '''
 
 import tensorflow as tf
+from .init import pytorch_initializer
 
-from tensorflow.contrib.layers import batch_norm
+from tensorflow.contrib.layers import batch_norm as tf_default_batch_norm
+def batch_norm(x, is_training, scope):
+    # pytorch batch_norm defaults
+    return tf_default_batch_norm(x, is_training=is_training, scope=scope, decay=0.9, epsilon=1e-5)
 
 def convert_params(params):
     '''Convert the channel order of parameters between PyTorch and
@@ -26,7 +30,7 @@ def convert_params(params):
 
 def conv2d(x, phase, n_filters, kernel_size, strides=[1,1,1,1],
         activation_fn=tf.nn.relu,
-        initializer=tf.contrib.layers.xavier_initializer_conv2d,
+        initializer=pytorch_initializer,
         padding='SAME', scope=None, bias=True):
     with tf.variable_scope(scope):
         n_input_channels = int(x.shape[3])
@@ -50,7 +54,7 @@ def resnet50(inputs, phase, conv2d=conv2d):
     definition: https://github.com/kuangliu/pytorch-cifar/blob/master/models/resnet.py#L41-L66
     '''
     def conv2d_norelu(x, phase, n_filters, kernel_size, strides=[1,1,1,1],
-        initializer=tf.contrib.layers.xavier_initializer_conv2d,
+        initializer=pytorch_initializer,
         padding='SAME', scope=None, bias=True):
         return conv2d(x, phase, n_filters, kernel_size,
                 strides=strides, activation_fn=lambda x:x,

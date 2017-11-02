@@ -3,15 +3,8 @@
 import math
 
 # call it by the original class name
-import tensorflow as tf
+from tensorflow.contrib.layers import variance_scaling_initializer
+from tensorflow.python.framework import dtypes
 
-class PyTorchInit(tf.random_uniform_initializer):
-    def __call__(self, shape, dtype=None, partition_info=None):
-        n = shape[2] # in_channels
-        for k in shape[:2]:
-            n *= k # kernel size
-        stdv = 1./math.sqrt(n)
-        self.minval = -stdv
-        self.maxval = stdv
-        print(self.minval, self.maxval, shape)
-        super(PyTorchInit, self).__call__(shape, dtype=dtype, partition_info=partition_info)
+def pytorch_initializer(uniform=True, seed=None, dtype=dtypes.float32):
+  return variance_scaling_initializer(factor=1./3, mode='FAN_IN', uniform=uniform, seed=seed, dtype=dtype)

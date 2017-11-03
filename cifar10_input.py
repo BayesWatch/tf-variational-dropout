@@ -23,6 +23,7 @@ import os
 
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
+import numpy as np
 
 # Process images of this size. Note that this differs from the original CIFAR
 # image size of 32 x 32. If one alters this number, then the entire model
@@ -168,7 +169,10 @@ def distorted_inputs(data_dir, batch_size):
   # distortions applied to the image.
 
   # Randomly crop a [height, width] section of the image.
-  distorted_image = tf.random_crop(reshaped_image, [height, width, 3])
+  padded_image = tf.pad(reshaped_image, [[4,4],
+                                         [4,4],
+                                         [0,0]])
+  distorted_image = tf.random_crop(padded_image, [height, width, 3])
 
   # Randomly flip the image horizontally.
   distorted_image = tf.image.random_flip_left_right(distorted_image)
@@ -183,7 +187,14 @@ def distorted_inputs(data_dir, batch_size):
                                              lower=0.2, upper=1.8)
 
   # Subtract off the mean and divide by the variance of the pixels.
-  float_image = tf.image.per_image_standardization(distorted_image)
+  # Global Normalization based on known mean and stdv
+  means = tf.Variable(np.array([0.4914, 0.4822, 0.4465]).astype(np.float32).reshape(1,1,3),
+          name='input_channel_means')
+  sigmas = tf.Variable(np.array([0.2023, 0.1994, 0.2010]).astype(np.float32).reshape(1,1,3),
+          name='input_channel_sigmas')
+  # Subtract off the mean and divide by the variance of the pixels.
+  standard_image = tf.image.per_image_standardization(distorted_image)
+  float_image = (standard_image-means)/sigmas
 
   # Set the shapes of tensors.
   float_image.set_shape([height, width, 3])
